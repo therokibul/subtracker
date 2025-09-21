@@ -1,9 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/subscription.dart';
 import '../providers/subscription_provider.dart';
-import '../utils/currency_helper.dart'; 
+import '../utils/currency_helper.dart';
 import 'add_subscription_screen.dart';
 import 'settings_screen.dart';
 
@@ -38,9 +39,7 @@ class HomeScreen extends StatelessWidget {
                   Icon(
                     Icons.receipt_long,
                     size: 80,
-                    color: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.color?.withOpacity(0.6),
+                    color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.6),
                   ),
                   const SizedBox(height: 20),
                   Text(
@@ -74,15 +73,23 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
+  // Helper function to build the display card for a single subscription.
   Widget _buildSubscriptionCard(BuildContext context, Subscription sub) {
+    ImageProvider? logoImage;
+    if (sub.logoIdentifier != null) {
+      if (sub.logoType == LogoType.network) {
+        logoImage = NetworkImage(sub.logoIdentifier!);
+      } else if (sub.logoType == LogoType.file) {
+        logoImage = FileImage(File(sub.logoIdentifier!));
+      }
+    }
+
     return Dismissible(
       key: ValueKey(sub.id),
       direction: DismissDirection.endToStart,
       onDismissed: (direction) {
-        Provider.of<SubscriptionProvider>(
-          context,
-          listen: false,
-        ).deleteSubscription(sub.id);
+        Provider.of<SubscriptionProvider>(context, listen: false)
+            .deleteSubscription(sub.id);
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -92,37 +99,32 @@ class HomeScreen extends StatelessWidget {
         );
       },
       background: Container(
-        color: Colors.red,
+        decoration: BoxDecoration(
+          color: Colors.red,
+          borderRadius: BorderRadius.circular(10.0),
+        ),
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20.0),
-        margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+        margin: const EdgeInsets.symmetric(vertical: 8.0),
         child: const Icon(Icons.delete, color: Colors.white),
       ),
       child: Card(
         elevation: 2.0,
         margin: const EdgeInsets.symmetric(vertical: 8.0),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10.0),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
         child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16.0,
-            vertical: 8.0,
-          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
           leading: CircleAvatar(
             radius: 25,
             backgroundColor: sub.color,
-            backgroundImage: sub.logoUrl != null && sub.logoUrl!.isNotEmpty
-                ? NetworkImage(sub.logoUrl!)
-                : null,
-            child: sub.logoUrl == null || sub.logoUrl!.isEmpty
+            backgroundImage: logoImage,
+            child: logoImage == null
                 ? Text(
                     sub.name.substring(0, 1).toUpperCase(),
                     style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white),
                   )
                 : null,
           ),
@@ -135,7 +137,9 @@ class HomeScreen extends StatelessWidget {
             children: [
               if (sub.category != null && sub.category!.isNotEmpty)
                 Text(sub.category!),
-              Text('Next: ${DateFormat.yMMMd().format(sub.nextPaymentDate)}'),
+              Text(
+                'Next: ${DateFormat.yMMMd().format(sub.nextPaymentDate)}',
+              ),
             ],
           ),
           trailing: Column(
@@ -152,10 +156,11 @@ class HomeScreen extends StatelessWidget {
               Text(
                 '/ ${_getBillingCycleText(sub.billingCycle)}',
                 style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-              ),
+              )
             ],
           ),
           onTap: () {
+            // Navigate to the edit screen
             Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (context) => AddSubscriptionScreen(subscription: sub),
@@ -182,3 +187,4 @@ class HomeScreen extends StatelessWidget {
     }
   }
 }
+

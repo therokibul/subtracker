@@ -1,76 +1,72 @@
 import 'package:flutter/material.dart';
 
-enum BillingCycle {
-  daily,
-  weekly,
-  monthly,
-  yearly,
-}
+enum BillingCycle { daily, weekly, monthly, yearly }
+enum LogoType { network, file } // Two types: network for predefined, file for uploaded
 
 class Subscription {
   final String id;
   final String name;
   final double amount;
+  final String currency;
   final DateTime lastPaidDate;
   final DateTime nextPaymentDate;
-  final String currency;
   final BillingCycle billingCycle;
-  final String? logoUrl;
   final String? note;
-  final int colorValue;
+  final Color color;
   final String? category;
   final bool receiveReminders;
+  final String? logoIdentifier; // Can be a URL or a local file path
+  final LogoType logoType;
 
   Subscription({
     required this.id,
     required this.name,
     required this.amount,
+    required this.currency,
     required this.lastPaidDate,
     required this.nextPaymentDate,
-    required this.currency,
     required this.billingCycle,
-    this.logoUrl,
     this.note,
-    required this.colorValue,
+    required int colorValue,
     this.category,
     required this.receiveReminders,
-  });
+    this.logoIdentifier,
+    this.logoType = LogoType.network,
+  }) : color = Color(colorValue);
 
-  Color get color => Color(colorValue);
-
-  // Factory constructor to create a Subscription from a map (JSON)
   factory Subscription.fromJson(Map<String, dynamic> json) {
     return Subscription(
       id: json['id'],
       name: json['name'],
       amount: json['amount'],
+      currency: json['currency'],
       lastPaidDate: DateTime.parse(json['lastPaidDate']),
       nextPaymentDate: DateTime.parse(json['nextPaymentDate']),
-      currency: json['currency'],
       billingCycle: BillingCycle.values[json['billingCycle']],
-      logoUrl: json['logoUrl'],
       note: json['note'],
       colorValue: json['colorValue'],
       category: json['category'],
       receiveReminders: json['receiveReminders'],
+      logoIdentifier: json['logoIdentifier'],
+      logoType: LogoType.values[json['logoType'] ?? LogoType.network.index],
     );
   }
 
-  // Method to convert a Subscription object to a map (JSON)
   Map<String, dynamic> toJson() {
     return {
       'id': id,
       'name': name,
       'amount': amount,
+      'currency': currency,
       'lastPaidDate': lastPaidDate.toIso8601String(),
       'nextPaymentDate': nextPaymentDate.toIso8601String(),
-      'currency': currency,
       'billingCycle': billingCycle.index,
-      'logoUrl': logoUrl,
       'note': note,
-      'colorValue': colorValue,
+      'colorValue': color.value,
       'category': category,
       'receiveReminders': receiveReminders,
+      'logoIdentifier': logoIdentifier,
+      'logoType': logoType.index,
     };
   }
 }
