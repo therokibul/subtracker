@@ -26,17 +26,17 @@ class NotificationService {
     // iOS initialization settings.
     const DarwinInitializationSettings initializationSettingsIOS =
         DarwinInitializationSettings(
-          requestSoundPermission: false,
-          requestBadgePermission: false,
-          requestAlertPermission: false,
-        );
+      requestSoundPermission: false,
+      requestBadgePermission: false,
+      requestAlertPermission: false,
+    );
 
     // Combine the platform-specific settings.
     const InitializationSettings initializationSettings =
         InitializationSettings(
-          android: initializationSettingsAndroid,
-          iOS: initializationSettingsIOS,
-        );
+      android: initializationSettingsAndroid,
+      iOS: initializationSettingsIOS,
+    );
 
     // Initialize the timezone database.
     tz.initializeTimeZones();
@@ -49,9 +49,12 @@ class NotificationService {
   void requestIOSPermissions() {
     flutterLocalNotificationsPlugin
         .resolvePlatformSpecificImplementation<
-          IOSFlutterLocalNotificationsPlugin
-        >()
-        ?.requestPermissions(alert: true, badge: true, sound: true);
+            IOSFlutterLocalNotificationsPlugin>()
+        ?.requestPermissions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
   }
 
   // Schedules a notification to appear at a specific time.
@@ -66,7 +69,7 @@ class NotificationService {
       print("Attempted to schedule a notification in the past. Aborting.");
       return;
     }
-
+    
     await flutterLocalNotificationsPlugin.zonedSchedule(
       id,
       title,
@@ -83,10 +86,13 @@ class NotificationService {
         ),
         iOS: DarwinNotificationDetails(),
       ),
-      androidScheduleMode: AndroidScheduleMode.exact,
-      // androidAllowWhileIdle: true,
-      //  uiLocalNotificationDateInterpretation:
-      //    UILocalNotificationDateInterpretation.absoluteTime, androidScheduleMode: null,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
     );
   }
+
+  // Cancels a previously scheduled notification.
+  Future<void> cancelNotification(int id) async {
+    await flutterLocalNotificationsPlugin.cancel(id);
+  }
 }
+

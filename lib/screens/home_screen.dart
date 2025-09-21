@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:subtracker/screens/add_subscribtion_screen.dart';
 
 import '../models/subscription.dart';
 import '../providers/subscription_provider.dart';
-import 'add_subscribtion_screen.dart';
 import 'settings_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -12,16 +12,14 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Access the SubscriptionProvider to get the list of subscriptions.
     final subscriptionProvider = Provider.of<SubscriptionProvider>(context);
     final subscriptions = subscriptionProvider.subscriptions;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('SubTracker'),
+        title: const Text('Subscriptions'),
         centerTitle: true,
         actions: [
-          // Icon button to navigate to the settings screen
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
@@ -32,7 +30,6 @@ class HomeScreen extends StatelessWidget {
           ),
         ],
       ),
-      // The body of the screen shows the list of subscriptions or an empty state message.
       body: subscriptions.isEmpty
           ? Center(
               child: Column(
@@ -67,7 +64,6 @@ class HomeScreen extends StatelessWidget {
       floatingActionButton: FloatingActionButton(
         child: const Icon(Icons.add),
         onPressed: () {
-          // Navigate to the screen for adding a new subscription.
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (context) => const AddSubscriptionScreen(),
@@ -80,106 +76,99 @@ class HomeScreen extends StatelessWidget {
 
   // Helper function to build the display card for a single subscription.
   Widget _buildSubscriptionCard(BuildContext context, Subscription sub) {
-    // Determine the text color based on the brightness of the card's background color.
-    final textColor = sub.cardColor!.computeLuminance() > 0.5
-        ? Colors.black
-        : Colors.white;
+    return Dismissible(
+      key: ValueKey(sub.id),
+      direction: DismissDirection.endToStart,
+      onDismissed: (direction) {
+        Provider.of<SubscriptionProvider>(
+          context,
+          listen: false,
+        ).deleteSubscription(sub.id);
 
-    return Card(
-      elevation: 4.0,
-      margin: const EdgeInsets.symmetric(vertical: 8.0),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)),
-      // The color is dynamically set based on the logo.
-      color: sub.cardColor,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                // Display the logo or a fallback CircleAvatar.
-                CircleAvatar(
-                  radius: 25,
-                  backgroundColor: Colors.white.withOpacity(0.9),
-                  backgroundImage:
-                      sub.logoUrl != null && sub.logoUrl!.isNotEmpty
-                      ? NetworkImage(sub.logoUrl!)
-                      : null,
-                  child: sub.logoUrl == null || sub.logoUrl!.isEmpty
-                      ? Text(
-                          sub.name.substring(0, 1).toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: sub.cardColor,
-                          ),
-                        )
-                      : null,
-                ),
-                const SizedBox(width: 15),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        sub.name,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                          color: textColor,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        // Format the currency and amount.
-                        '${sub.currency} ${sub.amount.toStringAsFixed(2)} / ${_getBillingCycleText(sub.billingCycle)}',
-                        style: TextStyle(color: textColor.withOpacity(0.85)),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 15),
-            Text(
-              // Format and display the next payment date.
-              'Next Payment: ${DateFormat.yMMMd().format(sub.nextPaymentDate)}',
-              style: TextStyle(
-                fontWeight: FontWeight.w500,
-                color: textColor.withOpacity(0.9),
-              ),
-            ),
-            // Conditionally display the description and note if they exist.
-            if (sub.description.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(sub.description, style: TextStyle(color: textColor)),
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${sub.name} subscription deleted'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      },
+      background: Container(
+        color: Colors.red,
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20.0),
+        margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+        child: const Icon(Icons.delete, color: Colors.white),
+      ),
+      child: Card(
+        elevation: 2.0,
+        margin: const EdgeInsets.symmetric(vertical: 8.0),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10.0),
+        ),
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16.0,
+            vertical: 8.0,
+          ),
+          leading: CircleAvatar(
+            radius: 25,
+            backgroundColor: sub.color,
+            backgroundImage: sub.logoUrl != null && sub.logoUrl!.isNotEmpty
+                ? NetworkImage(sub.logoUrl!)
+                : null,
+            child: sub.logoUrl == null || sub.logoUrl!.isEmpty
+                ? Text(
+                    sub.name.substring(0, 1).toUpperCase(),
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  )
+                : null,
+          ),
+          title: Text(
+            sub.name,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (sub.category != null && sub.category!.isNotEmpty)
+                Text(sub.category!),
+              Text('Next: ${DateFormat.yMMMd().format(sub.nextPaymentDate)}'),
             ],
-            if (sub.note != null && sub.note!.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(8),
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'Note: ${sub.note}',
-                  style: TextStyle(
-                    fontStyle: FontStyle.italic,
-                    color: textColor,
-                  ),
+          ),
+          trailing: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${sub.currency} ${sub.amount.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
                 ),
               ),
+              Text(
+                '/ ${_getBillingCycleText(sub.billingCycle)}',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
             ],
-          ],
+          ),
+          onTap: () {
+            // Navigate to the edit screen
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => AddSubscriptionScreen(subscription: sub),
+              ),
+            );
+          },
         ),
       ),
     );
   }
 
-  // Helper function to get a display-friendly string for the billing cycle.
   String _getBillingCycleText(BillingCycle cycle) {
     switch (cycle) {
       case BillingCycle.daily:
@@ -188,14 +177,8 @@ class HomeScreen extends StatelessWidget {
         return 'Week';
       case BillingCycle.monthly:
         return 'Month';
-      case BillingCycle.quarterly:
-        return 'Quarter';
-      case BillingCycle.semiAnnually:
-        return '6 Months';
       case BillingCycle.yearly:
         return 'Year';
-      case BillingCycle.onetime:
-        return 'One-Time';
       default:
         return '';
     }

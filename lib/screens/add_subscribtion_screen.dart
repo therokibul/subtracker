@@ -1,6 +1,5 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:image_pixels/image_pixels.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/subscription.dart';
@@ -8,7 +7,9 @@ import '../providers/subscription_provider.dart';
 import '../services/notification_service.dart';
 
 class AddSubscriptionScreen extends StatefulWidget {
-  const AddSubscriptionScreen({super.key});
+  final Subscription? subscription;
+
+  const AddSubscriptionScreen({super.key, this.subscription});
 
   @override
   State<AddSubscriptionScreen> createState() => _AddSubscriptionScreenState();
@@ -18,96 +19,98 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _amountController = TextEditingController();
-  final _logoUrlController = TextEditingController();
-  final _descriptionController = TextEditingController();
   final _noteController = TextEditingController();
+  final _logoUrlController = TextEditingController();
+  final _categoryController = TextEditingController();
 
-  DateTime? _selectedDate;
+  DateTime? _lastPaidDate;
   BillingCycle _selectedBillingCycle = BillingCycle.monthly;
   String _selectedCurrency = 'USD';
-  Color _extractedColor = Colors.deepPurple; // Default color
-  Timer? _debounce;
-  bool _isExtractingColor = false;
+  Color _selectedColor = Colors.deepPurple;
+  bool _receiveReminders = true;
 
   final List<String> _currencies = ['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD'];
+  final List<String> _categories = [
+    'Streaming',
+    'Gaming',
+    'Software',
+    'Utilities',
+    'Music',
+    'Password Managers',
+    'Other'
+  ];
 
-  // Clean up the controllers when the widget is disposed.
+  @override
+  void initState() {
+    super.initState();
+    if (widget.subscription != null) {
+      final sub = widget.subscription!;
+      _nameController.text = sub.name;
+      _amountController.text = sub.amount.toString();
+      _noteController.text = sub.note ?? '';
+      _logoUrlController.text = sub.logoUrl ?? '';
+      _categoryController.text = sub.category ?? '';
+      _lastPaidDate = sub.lastPaidDate;
+      _selectedBillingCycle = sub.billingCycle;
+      _selectedCurrency = sub.currency;
+      _selectedColor = sub.color;
+      _receiveReminders = sub.receiveReminders;
+    }
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
     _amountController.dispose();
-    _logoUrlController.dispose();
-    _descriptionController.dispose();
     _noteController.dispose();
-    _debounce?.cancel();
+    _logoUrlController.dispose();
+    _categoryController.dispose();
     super.dispose();
   }
 
-  // Extracts the dominant color from an image URL.
-  // Uses a debounce to avoid making too many network requests while typing.
-  void _onLogoUrlChanged(String url) {
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 1000), () {
-      if (url.isNotEmpty && (url.startsWith('http') || url.startsWith('https'))) {
-        _extractColorFromUrl(url);
-      }
-    });
-  }
-
-  Future<void> _extractColorFromUrl(String url) async {
-    setState(() {
-      _isExtractingColor = true;
-    });
-    try {
-      // Using ImagePixels to get color information from the image.
-      // We wrap it in a widget that is never displayed to use its functionality.
-      await ImagePixels.container(
-        imageProvider: NetworkImage(url),
-        // colorCallback: (color) {
-        //   setState(() {
-        //     _extractedColor = color;
-        //     _isExtractingColor = false;
-        //   });
-        // },
-      );
-    } catch (e) {
-      // If color extraction fails, fall back to the default color.
-      setState(() {
-        _extractedColor = Theme.of(context).primaryColor;
-        _isExtractingColor = false;
-      });
-      print("Error extracting color: $e");
-    }
-  }
-
-
-  // Shows the date picker dialog to select the next payment date.
   void _presentDatePicker() {
     showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime.now(),
-      lastDate: DateTime(2101),
+      initialDate: _lastPaidDate ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
     ).then((pickedDate) {
-      if (pickedDate == null) {
-        return;
-      }
+      if (pickedDate == null) return;
       setState(() {
-        _selectedDate = pickedDate;
+        _lastPaidDate = pickedDate;
       });
     });
   }
 
-  // Validates the form and saves the new subscription.
+  DateTime _calculateNextPaymentDate(DateTime lastPaid, BillingCycle cycle) {
+    DateTime nextDate = lastPaid;
+    // Keep adding the billing cycle duration until the date is in the future.
+    while (nextDate.isBefore(DateTime.now())) {
+      switch (cycle) {
+        case BillingCycle.daily:
+          nextDate = nextDate.add(const Duration(days: 1));
+          break;
+        case BillingCycle.weekly:
+          nextDate = nextDate.add(const Duration(days: 7));
+          break;
+        case BillingCycle.monthly:
+          nextDate = DateTime(nextDate.year, nextDate.month + 1, nextDate.day);
+          break;
+        case BillingCycle.yearly:
+          nextDate = DateTime(nextDate.year + 1, nextDate.month, nextDate.day);
+          break;
+      }
+    }
+    return nextDate;
+  }
+
   void _saveForm() {
     final isValid = _formKey.currentState?.validate() ?? false;
-
-    if (!isValid || _selectedDate == null) {
-      if (_selectedDate == null && isValid) {
-        // Show a snackbar if the date is missing
+    if (!isValid || _lastPaidDate == null) {
+      if (_lastPaidDate == null && isValid) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Please select a payment date.'),
+            content: const Text('Please select the last payment date.'),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
@@ -116,41 +119,79 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
     }
     _formKey.currentState?.save();
 
+    final nextPaymentDate =
+        _calculateNextPaymentDate(_lastPaidDate!, _selectedBillingCycle);
+
     final newSubscription = Subscription(
-      id: DateTime.now().toString(), // Using timestamp as a simple unique ID
+      id: widget.subscription?.id ?? DateTime.now().toString(),
       name: _nameController.text,
       amount: double.parse(_amountController.text),
-      nextPaymentDate: _selectedDate!,
+      lastPaidDate: _lastPaidDate!,
+      nextPaymentDate: nextPaymentDate,
       currency: _selectedCurrency,
       billingCycle: _selectedBillingCycle,
       logoUrl: _logoUrlController.text,
-      description: _descriptionController.text,
       note: _noteController.text,
-      cardColor: _extractedColor, 
-     
+      colorValue: _selectedColor.value,
+      category: _categoryController.text,
+      receiveReminders: _receiveReminders,
     );
 
-    // Add the subscription to the provider
-    Provider.of<SubscriptionProvider>(context, listen: false)
-        .addSubscription(newSubscription);
+    final provider = Provider.of<SubscriptionProvider>(context, listen: false);
+    final notificationService = NotificationService();
+    final notificationId = newSubscription.id.hashCode;
 
-    // Schedule a notification
-    NotificationService().scheduleNotification(
-      id: newSubscription.id.hashCode,
-      title: 'Upcoming Payment Reminder',
-      body:
-          'Your payment for ${newSubscription.name} of ${newSubscription.currency} ${newSubscription.amount.toStringAsFixed(2)} is due in 3 days.',
-      scheduledDate: _selectedDate!.subtract(const Duration(days: 3)),
-    );
+    if (widget.subscription != null) {
+      notificationService.cancelNotification(notificationId);
+      provider.updateSubscription(newSubscription);
+    } else {
+      provider.addSubscription(newSubscription);
+    }
+
+    if (_receiveReminders) {
+      notificationService.scheduleNotification(
+        id: notificationId,
+        title: 'Upcoming Payment: ${newSubscription.name}',
+        body:
+            'Your payment of ${newSubscription.currency} ${newSubscription.amount.toStringAsFixed(2)} is due in 3 days.',
+        scheduledDate: nextPaymentDate.subtract(const Duration(days: 3)),
+      );
+    }
 
     Navigator.of(context).pop();
+  }
+
+  void _showColorPicker() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Pick a color'),
+        content: SingleChildScrollView(
+          child: ColorPicker(
+            pickerColor: _selectedColor,
+            onColorChanged: (color) {
+              setState(() => _selectedColor = color);
+            },
+            pickerAreaHeightPercent: 0.8,
+          ),
+        ),
+        actions: <Widget>[
+          TextButton(
+            child: const Text('Got it'),
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add Subscription'),
+        title: Text(widget.subscription == null ? 'Add Subscription' : 'Edit Subscription'),
         actions: [
           IconButton(
             icon: const Icon(Icons.save),
@@ -164,123 +205,178 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
           key: _formKey,
           child: ListView(
             children: <Widget>[
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Subscription Name'),
-                textInputAction: TextInputAction.next,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a name.';
-                  }
-                  return null;
-                },
-              ),
-              TextFormField(
-                controller: _amountController,
-                decoration: const InputDecoration(labelText: 'Amount'),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                textInputAction: TextInputAction.next,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter an amount.';
-                  }
-                  if (double.tryParse(value) == null) {
-                    return 'Please enter a valid number.';
-                  }
-                  return null;
-                },
-              ),
-              DropdownButtonFormField<String>(
-                value: _selectedCurrency,
-                decoration: const InputDecoration(labelText: 'Currency'),
-                items: _currencies.map((String currency) {
-                  return DropdownMenuItem<String>(
-                    value: currency,
-                    child: Text(currency),
-                  );
-                }).toList(),
-                onChanged: (newValue) {
-                  setState(() {
-                    _selectedCurrency = newValue!;
-                  });
-                },
-              ),
-              DropdownButtonFormField<BillingCycle>(
-                value: _selectedBillingCycle,
-                decoration: const InputDecoration(labelText: 'Billing Cycle'),
-                items: BillingCycle.values.map((BillingCycle cycle) {
-                  return DropdownMenuItem<BillingCycle>(
-                    value: cycle,
-                    child: Text(cycle.toString().split('.').last),
-                  );
-                }).toList(),
-                onChanged: (newValue) {
-                  setState(() {
-                    _selectedBillingCycle = newValue!;
-                  });
-                },
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      _selectedDate == null
-                          ? 'No Date Chosen!'
-                          : 'Next Payment: ${DateFormat.yMd().format(_selectedDate!)}',
+              Center(
+                child: Column(
+                  children: [
+                    CircleAvatar(
+                      radius: 30,
+                      backgroundColor: _selectedColor,
+                      backgroundImage: _logoUrlController.text.isNotEmpty
+                          ? NetworkImage(_logoUrlController.text)
+                          : null,
+                      child: _logoUrlController.text.isEmpty
+                          ? const Icon(Icons.image, color: Colors.white, size: 30)
+                          : null,
                     ),
-                  ),
-                  TextButton(
-                    onPressed: _presentDatePicker,
-                    child: const Text(
-                      'Choose Date',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: _amountController,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+                      decoration: InputDecoration(
+                        hintText: '0.00',
+                        border: InputBorder.none,
+                        prefixText: '${_getCurrencySymbol(_selectedCurrency)} ',
+                        prefixStyle: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      validator: (value) => (value == null || double.tryParse(value) == null) ? 'Enter a valid amount' : null,
                     ),
-                  )
-                ],
-              ),
-               TextFormField(
-                controller: _logoUrlController,
-                decoration: InputDecoration(
-                  labelText: 'Logo URL (Optional)',
-                  suffixIcon: _isExtractingColor
-                      ? const Padding(
-                        padding: EdgeInsets.all(8.0),
-                        child: CircularProgressIndicator(),
-                      )
-                      : Container(
-                          margin: const EdgeInsets.all(12),
-                          width: 20,
-                          height: 20,
-                          color: _extractedColor,
-                        ),
+                  ],
                 ),
-                keyboardType: TextInputType.url,
-                textInputAction: TextInputAction.next,
-                onChanged: _onLogoUrlChanged,
-              ),
-              TextFormField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(labelText: 'Description (Optional)'),
-                textInputAction: TextInputAction.next,
-                maxLines: 2,
-              ),
-              TextFormField(
-                controller: _noteController,
-                decoration: const InputDecoration(labelText: 'Note (Optional)'),
-                textInputAction: TextInputAction.done,
-                onFieldSubmitted: (_) => _saveForm(),
               ),
               const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _saveForm,
-                child: const Text('Save Subscription'),
-              ),
+              _buildTextFormField(controller: _nameController, label: 'Title'),
+              const SizedBox(height: 16),
+              _buildColorField(),
+              const SizedBox(height: 16),
+              _buildTextFormField(controller: _noteController, label: 'Notes (Optional)'),
+              const SizedBox(height: 16),
+              _buildTextFormField(controller: _logoUrlController, label: 'Link/URL (Optional)'),
+              const SizedBox(height: 16),
+              _buildDateField(),
+              const SizedBox(height: 16),
+              _buildBillingCycleField(),
+               const SizedBox(height: 16),
+              _buildCategoryField(),
+              _buildReminderField(),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildTextFormField({required TextEditingController controller, required String label}) {
+     return TextFormField(
+      controller: controller,
+      decoration: InputDecoration(
+        labelText: label,
+        filled: true,
+        fillColor: Theme.of(context).brightness == Brightness.dark ? Colors.grey[800] : Colors.grey[200],
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide.none,
+        ),
+      ),
+      validator: label == 'Title' ? (value) => (value == null || value.isEmpty) ? 'Please enter a title' : null : null,
+    );
+  }
+
+  Widget _buildColorField() {
+    return _buildContainerForField(
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12.0),
+        title: const Text('Color'),
+        trailing: CircleAvatar(backgroundColor: _selectedColor, radius: 15),
+        onTap: _showColorPicker,
+      ),
+    );
+  }
+
+  Widget _buildDateField() {
+     return _buildContainerForField(
+       child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12.0),
+        title: const Text('Last Paid Date'),
+        trailing: Text(_lastPaidDate == null ? 'Not Set' : DateFormat.yMMMd().format(_lastPaidDate!)),
+        onTap: _presentDatePicker,
+           ),
+     );
+  }
+
+  Widget _buildBillingCycleField() {
+    return _buildContainerForField(
+      child: DropdownButtonFormField<BillingCycle>(
+        value: _selectedBillingCycle,
+        decoration: InputDecoration(
+          labelText: 'Billing Cycle',
+          filled: true,
+          fillColor: Theme.of(context).brightness == Brightness.dark ? Colors.grey[800] : Colors.grey[200],
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide.none,
+          ),
+        ),
+        items: BillingCycle.values.map((cycle) {
+          return DropdownMenuItem(
+            value: cycle,
+            child: Text(cycle.name[0].toUpperCase() + cycle.name.substring(1)),
+          );
+        }).toList(),
+        onChanged: (value) {
+          if (value != null) setState(() => _selectedBillingCycle = value);
+        },
+      ),
+    );
+  }
+
+  Widget _buildCategoryField() {
+    return _buildContainerForField(
+      child: DropdownButtonFormField<String>(
+        value: _categoryController.text.isEmpty ? null : _categoryController.text,
+        hint: const Text('Category'),
+         decoration: InputDecoration(
+          labelText: 'Category',
+          filled: true,
+          fillColor: Theme.of(context).brightness == Brightness.dark ? Colors.grey[800] : Colors.grey[200],
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide.none,
+          ),
+        ),
+        items: _categories.map((cat) => DropdownMenuItem(value: cat, child: Text(cat))).toList(),
+        onChanged: (value) {
+          if (value != null) setState(() => _categoryController.text = value);
+        },
+      ),
+    );
+  }
+
+  Widget _buildReminderField() {
+    return _buildContainerForField(
+      child: SwitchListTile(
+        title: const Text('Receive Reminders'),
+        value: _receiveReminders,
+        onChanged: (value) {
+          setState(() => _receiveReminders = value);
+        },
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12.0),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContainerForField({required Widget child}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[800] : Colors.grey[200],
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: child,
+    );
+  }
+
+  String _getCurrencySymbol(String currencyCode) {
+    switch (currencyCode) {
+      case 'USD': return '\$';
+      case 'EUR': return '€';
+      case 'GBP': return '£';
+      case 'JPY': return '¥';
+      default: return currencyCode;
+    }
   }
 }
 
