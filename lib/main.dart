@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:subtracker/providers/subscription_provider.dart';
 import 'package:subtracker/providers/theme_provider.dart';
 import 'package:subtracker/screens/home_screen.dart';
 
@@ -16,7 +17,7 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (context) => ThemeProvider()),
-        // ChangeNotifierProvider(create: (context) => S()),
+         ChangeNotifierProvider(create: (context) => SubscriptionProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
