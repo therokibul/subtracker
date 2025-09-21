@@ -1,15 +1,23 @@
-
 import 'package:flutter/material.dart';
 
-enum BillingCycle {onetime, monthly, yearly, weekly, daily, quarterly, semiAnnually }
-class Subscription{
+enum BillingCycle {
+  onetime,
+  monthly,
+  yearly,
+  weekly,
+  daily,
+  quarterly,
+  semiAnnually,
+}
+
+class Subscription {
   final String name;
   final double amount;
   final DateTime NextPaymentDate;
   final String currency;
   final BillingCycle billingCycle;
   final String? notes;
-  final String? logoUrl; 
+  final String? logoUrl;
   final String description;
   final Color? cardColor;
 
