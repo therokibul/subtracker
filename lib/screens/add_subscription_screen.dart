@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:intl/intl.dart';
@@ -5,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../models/subscription.dart';
 import '../providers/subscription_provider.dart';
 import '../services/notification_service.dart';
+import '../utils/currency_helper.dart';
 
 class AddSubscriptionScreen extends StatefulWidget {
   final Subscription? subscription;
@@ -29,7 +31,6 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
   Color _selectedColor = Colors.deepPurple;
   bool _receiveReminders = true;
 
-  final List<String> _currencies = ['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD'];
   final List<String> _categories = [
     'Streaming',
     'Gaming',
@@ -153,7 +154,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
         id: notificationId,
         title: 'Upcoming Payment: ${newSubscription.name}',
         body:
-            'Your payment of ${newSubscription.currency} ${newSubscription.amount.toStringAsFixed(2)} is due in 3 days.',
+            'Your payment of ${getCurrencySymbol(newSubscription.currency)} ${newSubscription.amount.toStringAsFixed(2)} is due in 3 days.',
         scheduledDate: nextPaymentDate.subtract(const Duration(days: 3)),
       );
     }
@@ -226,11 +227,31 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
                       decoration: InputDecoration(
                         hintText: '0.00',
                         border: InputBorder.none,
-                        prefixText: '${_getCurrencySymbol(_selectedCurrency)} ',
+                        prefixText: '${getCurrencySymbol(_selectedCurrency)} ',
                         prefixStyle: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
                       ),
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       validator: (value) => (value == null || double.tryParse(value) == null) ? 'Enter a valid amount' : null,
+                    ),
+                     SizedBox(
+                      width: 250, // Constrain the width of the dropdown
+                      child: DropdownButton<String>(
+                        isExpanded: true,
+                        value: _selectedCurrency,
+                        items: currencyNames.entries.map((entry) {
+                          return DropdownMenuItem<String>(
+                            value: entry.key,
+                            child: Text('${entry.key} - ${entry.value}', overflow: TextOverflow.ellipsis),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() {
+                              _selectedCurrency = value;
+                            });
+                          }
+                        },
+                      ),
                     ),
                   ],
                 ),
@@ -367,16 +388,6 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
       ),
       child: child,
     );
-  }
-
-  String _getCurrencySymbol(String currencyCode) {
-    switch (currencyCode) {
-      case 'USD': return '\$';
-      case 'EUR': return '€';
-      case 'GBP': return '£';
-      case 'JPY': return '¥';
-      default: return currencyCode;
-    }
   }
 }
 

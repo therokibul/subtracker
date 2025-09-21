@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:subtracker/screens/add_subscribtion_screen.dart';
-
 import '../models/subscription.dart';
 import '../providers/subscription_provider.dart';
+import '../utils/currency_helper.dart'; 
+import 'add_subscription_screen.dart';
 import 'settings_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -74,7 +74,6 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // Helper function to build the display card for a single subscription.
   Widget _buildSubscriptionCard(BuildContext context, Subscription sub) {
     return Dismissible(
       key: ValueKey(sub.id),
@@ -144,7 +143,7 @@ class HomeScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '${sub.currency} ${sub.amount.toStringAsFixed(2)}',
+                '${getCurrencySymbol(sub.currency)} ${sub.amount.toStringAsFixed(2)}',
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 15,
@@ -157,7 +156,6 @@ class HomeScreen extends StatelessWidget {
             ],
           ),
           onTap: () {
-            // Navigate to the edit screen
             Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (context) => AddSubscriptionScreen(subscription: sub),
