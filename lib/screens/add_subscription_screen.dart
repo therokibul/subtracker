@@ -159,7 +159,6 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
         scheduledDate: nextPaymentDate.subtract(const Duration(days: 3)),
       );
     }
-
     Navigator.of(context).pop();
   }
 
