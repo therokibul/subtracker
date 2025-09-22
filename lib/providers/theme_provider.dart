@@ -1,33 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// A mapping of color names to MaterialColor objects
+// A map to easily convert color names (string) to MaterialColor objects
 const Map<String, MaterialColor> materialColors = {
-  'red': Colors.red,
-  'pink': Colors.pink,
   'purple': Colors.purple,
   'deepPurple': Colors.deepPurple,
-  'indigo': Colors.indigo,
   'blue': Colors.blue,
-  'lightBlue': Colors.lightBlue,
-  'cyan': Colors.cyan,
+  'indigo': Colors.indigo,
   'teal': Colors.teal,
   'green': Colors.green,
-  'lightGreen': Colors.lightGreen,
-  'lime': Colors.lime,
-  'yellow': Colors.yellow,
-  'amber': Colors.amber,
   'orange': Colors.orange,
-  'deepOrange': Colors.deepOrange,
+  'red': Colors.red,
+  'pink': Colors.pink,
+  'cyan': Colors.cyan,
+  'amber': Colors.amber,
+  'lime': Colors.lime,
+  'blueGrey': Colors.blueGrey,
   'brown': Colors.brown,
   'grey': Colors.grey,
-  'blueGrey': Colors.blueGrey,
+  'lightBlue': Colors.lightBlue,
+  'lightGreen': Colors.lightGreen,
+  'deepOrange': Colors.deepOrange,
+  'yellow': Colors.yellow,
 };
 
-/// A provider class to manage theme settings
 class ThemeProvider with ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.system;
-  MaterialColor _primaryColor = Colors.green;
+  MaterialColor _primaryColor = Colors.teal;
 
   ThemeMode get themeMode => _themeMode;
   MaterialColor get primaryColor => _primaryColor;
@@ -36,7 +35,7 @@ class ThemeProvider with ChangeNotifier {
     _loadTheme();
   }
 
-  /// Sets the theme mode and saves it to shared preferences
+  // Sets the theme mode (light, dark, system) and persists the choice.
   void setThemeMode(ThemeMode mode) async {
     _themeMode = mode;
     notifyListeners();
@@ -44,26 +43,30 @@ class ThemeProvider with ChangeNotifier {
     await prefs.setInt('themeMode', mode.index);
   }
 
-  /// Sets the primary color and saves it to shared preferences
+  // Sets the primary color swatch and persists the choice.
   void setPrimaryColor(MaterialColor color) async {
     _primaryColor = color;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
-    final ColorName = materialColors.entries
+    // We save the color's name and look it up later.
+    final colorName = materialColors.entries
         .firstWhere((entry) => entry.value == color)
         .key;
-    await prefs.setString('primaryColor', ColorName);
+    await prefs.setString('primaryColor', colorName);
   }
 
-  /// Loads the theme settings from shared preferences
+  // Loads the saved theme preferences from SharedPreferences.
   Future<void> _loadTheme() async {
     final prefs = await SharedPreferences.getInstance();
 
+    // Load ThemeMode
     final themeModeIndex = prefs.getInt('themeMode') ?? ThemeMode.system.index;
     _themeMode = ThemeMode.values[themeModeIndex];
 
-    final colorName = prefs.getString('primaryColor') ?? 'green';
-    _primaryColor = materialColors[colorName] ?? Colors.green;
+    // Load Primary Color
+    final colorName = prefs.getString('primaryColor') ?? 'teal';
+    _primaryColor = materialColors[colorName] ?? Colors.teal;
+
     notifyListeners();
   }
 }

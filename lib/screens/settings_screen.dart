@@ -66,13 +66,14 @@ class SettingsScreen extends StatelessWidget {
     ThemeProvider themeProvider,
   ) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text('Primary Color', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 16),
         Wrap(
           spacing: 16.0,
           runSpacing: 16.0,
+
           children: materialColors.entries.map((entry) {
             final color = entry.value;
             final isSelected = themeProvider.primaryColor == color;

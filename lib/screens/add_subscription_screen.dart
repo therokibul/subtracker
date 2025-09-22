@@ -33,7 +33,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
   DateTime? _lastPaidDate;
   BillingCycle _selectedBillingCycle = BillingCycle.monthly;
   String _selectedCurrency = 'USD';
-  Color _selectedColor = Colors.deepPurple;
+  late Color _selectedColor = Theme.of(context).primaryColor;
   bool _receiveReminders = true;
   int _selectedReminderDays = 3;
 
@@ -259,9 +259,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
               ? 'Add Subscription'
               : 'Edit Subscription',
         ),
-        actions: [
-          IconButton(icon: const Icon(Icons.save), onPressed: _saveForm),
-        ],
+        
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -277,7 +275,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
               const SizedBox(height: 16),
               _buildTextFormField(
                 controller: _noteController,
-                label: 'Notes (Optional)',
+                label: 'Note (Optional)',
               ),
               const SizedBox(height: 16),
               _buildDateField(),
@@ -291,11 +289,32 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
                 const SizedBox(height: 16),
                 _buildReminderPeriodField(),
               ],
+              const SizedBox(height: 16),
+              _saveButton(context),
             ],
           ),
         ),
       ),
     );
+  }
+
+  ElevatedButton _saveButton(BuildContext context) {
+    return ElevatedButton(
+              onPressed: _saveForm,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(
+                  context,
+                ).primaryColor, // Sets the button's background
+                foregroundColor: Theme.of(
+                  context,
+                ).colorScheme.onPrimary, // Sets the text/icon color
+                minimumSize: const Size(double.infinity, 50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text('Save', style: TextStyle(fontSize: 18)),
+            );
   }
 
   Widget _buildHeader() {
@@ -483,12 +502,14 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
     return _buildContainerForField(
       child: SwitchListTile(
         title: const Text('Receive Reminders'),
+
         value: _receiveReminders,
         onChanged: (value) {
           setState(() => _receiveReminders = value);
         },
         contentPadding: const EdgeInsets.symmetric(horizontal: 12.0),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        activeColor: Theme.of(context).primaryColor,
       ),
     );
   }
