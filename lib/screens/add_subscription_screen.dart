@@ -1,13 +1,13 @@
-
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+
 import '../models/subscription.dart';
 import '../providers/subscription_provider.dart';
 import '../services/notification_service.dart';
@@ -35,13 +35,20 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
   String _selectedCurrency = 'USD';
   Color _selectedColor = Colors.deepPurple;
   bool _receiveReminders = true;
+  int _selectedReminderDays = 3; // State for reminder days
 
   // State variables for the logo
   String? _logoIdentifier;
   LogoType _logoType = LogoType.network;
 
   final List<String> _categories = [
-    'Streaming', 'Gaming', 'Software', 'Utilities', 'Music', 'Password Managers', 'Other'
+    'Streaming',
+    'Gaming',
+    'Software',
+    'Utilities',
+    'Music',
+    'Password Managers',
+    'Other',
   ];
 
   @override
@@ -60,6 +67,8 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
       _receiveReminders = sub.receiveReminders;
       _logoIdentifier = sub.logoIdentifier;
       _logoType = sub.logoType;
+      _selectedReminderDays =
+          sub.reminderDaysBefore; // Initialize from existing sub
     }
   }
 
@@ -122,7 +131,10 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
     }
     _formKey.currentState?.save();
 
-    final nextPaymentDate = _calculateNextPaymentDate(_lastPaidDate!, _selectedBillingCycle);
+    final nextPaymentDate = _calculateNextPaymentDate(
+      _lastPaidDate!,
+      _selectedBillingCycle,
+    );
 
     final newSubscription = Subscription(
       id: widget.subscription?.id ?? DateTime.now().toString(),
@@ -138,6 +150,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
       receiveReminders: _receiveReminders,
       logoIdentifier: _logoIdentifier,
       logoType: _logoType,
+      reminderDaysBefore: _selectedReminderDays, // Save the selected days
     );
 
     final provider = Provider.of<SubscriptionProvider>(context, listen: false);
@@ -152,13 +165,18 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
     }
 
     if (_receiveReminders) {
+      final days = newSubscription.reminderDaysBefore;
       notificationService.scheduleNotification(
         id: notificationId,
         title: 'Upcoming Payment: ${newSubscription.name}',
-        body: 'Your payment of ${getCurrencySymbol(newSubscription.currency)} ${newSubscription.amount.toStringAsFixed(2)} is due in 3 days.',
-        scheduledDate: nextPaymentDate.subtract(const Duration(days: 3)),
+        body:
+            'Your payment of ${getCurrencySymbol(newSubscription.currency)} ${newSubscription.amount.toStringAsFixed(2)} is due in $days day${days > 1 ? 's' : ''}.',
+        scheduledDate: nextPaymentDate.subtract(
+          Duration(days: days),
+        ), // Use dynamic days
       );
     }
+
     Navigator.of(context).pop();
   }
 
@@ -167,12 +185,13 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
 
     if (pickedFile != null) {
-      // Close the bottom sheet first
-      if(mounted) Navigator.of(context).pop();
+      if (mounted) Navigator.of(context).pop();
 
       final appDir = await getApplicationDocumentsDirectory();
       final fileName = p.basename(pickedFile.path);
-      final savedImage = await File(pickedFile.path).copy('${appDir.path}/$fileName');
+      final savedImage = await File(
+        pickedFile.path,
+      ).copy('${appDir.path}/$fileName');
 
       setState(() {
         _logoIdentifier = savedImage.path;
@@ -191,7 +210,10 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Select a Logo', style: Theme.of(context).textTheme.titleLarge),
+              Text(
+                'Select a Logo',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
               const SizedBox(height: 16),
               Expanded(
                 child: ListView.builder(
@@ -209,7 +231,8 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
                         setState(() {
                           _logoIdentifier = logoUrl;
                           _logoType = LogoType.network;
-                          _nameController.text = logoName; // Auto-fill the title
+                          _nameController.text =
+                              logoName; // Auto-fill the title
                         });
                         Navigator.of(ctx).pop();
                       },
@@ -222,7 +245,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
                 leading: const Icon(Icons.upload_file),
                 title: const Text('Upload from Gallery'),
                 onTap: _pickImageFromGallery,
-              )
+              ),
             ],
           ),
         );
@@ -260,7 +283,11 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.subscription == null ? 'Add Subscription' : 'Edit Subscription'),
+        title: Text(
+          widget.subscription == null
+              ? 'Add Subscription'
+              : 'Edit Subscription',
+        ),
         actions: [
           IconButton(icon: const Icon(Icons.save), onPressed: _saveForm),
         ],
@@ -277,36 +304,48 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
               const SizedBox(height: 16),
               _buildColorField(),
               const SizedBox(height: 16),
-              _buildTextFormField(controller: _noteController, label: 'Notes (Optional)'),
+              _buildTextFormField(
+                controller: _noteController,
+                label: 'Notes (Optional)',
+              ),
               const SizedBox(height: 16),
               _buildDateField(),
               const SizedBox(height: 16),
               _buildBillingCycleField(),
               const SizedBox(height: 16),
               _buildCategoryField(),
+              const SizedBox(height: 16),
               _buildReminderField(),
+              if (_receiveReminders) ...[
+                const SizedBox(height: 16),
+                _buildReminderPeriodField(), // Conditionally show the new dropdown
+              ],
             ],
           ),
         ),
       ),
     );
   }
-  
+
   Widget _buildHeader() {
     Widget logoWidget;
     ImageProvider? backgroundImage;
     if (_logoIdentifier != null) {
       switch (_logoType) {
         case LogoType.network:
-           backgroundImage = NetworkImage(_logoIdentifier!);
+          backgroundImage = NetworkImage(_logoIdentifier!);
           break;
         case LogoType.file:
           backgroundImage = FileImage(File(_logoIdentifier!));
           break;
       }
-       logoWidget = Container(); // Empty container as background image will be used
+      logoWidget = Container();
     } else {
-      logoWidget = const Icon(Icons.subscriptions, size: 40, color: Colors.white);
+      logoWidget = const Icon(
+        Icons.subscriptions,
+        size: 40,
+        color: Colors.white,
+      );
     }
 
     return Center(
@@ -331,7 +370,10 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
               border: InputBorder.none,
             ),
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            validator: (value) => (value == null || double.tryParse(value) == null) ? 'Enter a valid amount' : null,
+            validator: (value) =>
+                (value == null || double.tryParse(value) == null)
+                ? 'Enter a valid amount'
+                : null,
           ),
           DropdownButton<String>(
             value: _selectedCurrency,
@@ -339,7 +381,10 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
             items: currencyNames.entries.map((entry) {
               return DropdownMenuItem<String>(
                 value: entry.key,
-                child: Text('${entry.key} (${getCurrencySymbol(entry.key)})', overflow: TextOverflow.ellipsis),
+                child: Text(
+                  '${entry.key} (${getCurrencySymbol(entry.key)})',
+                  overflow: TextOverflow.ellipsis,
+                ),
               );
             }).toList(),
             onChanged: (value) {
@@ -355,22 +400,30 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
     );
   }
 
-  Widget _buildTextFormField({required TextEditingController controller, required String label}) {
-     return TextFormField(
+  Widget _buildTextFormField({
+    required TextEditingController controller,
+    required String label,
+  }) {
+    return TextFormField(
       controller: controller,
       decoration: InputDecoration(
         labelText: label,
         filled: true,
-        fillColor: Theme.of(context).brightness == Brightness.dark ? Colors.grey[800] : Colors.grey[200],
+        fillColor: Theme.of(context).brightness == Brightness.dark
+            ? Colors.grey[800]
+            : Colors.grey[200],
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide.none,
         ),
       ),
-      validator: label == 'Title' ? (value) => (value == null || value.isEmpty) ? 'Please enter a title' : null : null,
+      validator: label == 'Title'
+          ? (value) =>
+                (value == null || value.isEmpty) ? 'Please enter a title' : null
+          : null,
     );
   }
-  
+
   Widget _buildColorField() {
     return _buildContainerForField(
       child: ListTile(
@@ -381,26 +434,32 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
       ),
     );
   }
-  
+
   Widget _buildDateField() {
-     return _buildContainerForField(
-       child: ListTile(
+    return _buildContainerForField(
+      child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 12.0),
         title: const Text('Last Paid Date'),
-        trailing: Text(_lastPaidDate == null ? 'Not Set' : DateFormat.yMMMd().format(_lastPaidDate!)),
+        trailing: Text(
+          _lastPaidDate == null
+              ? 'Not Set'
+              : DateFormat.yMMMd().format(_lastPaidDate!),
+        ),
         onTap: _presentDatePicker,
-           ),
-     );
+      ),
+    );
   }
 
   Widget _buildBillingCycleField() {
     return _buildContainerForField(
       child: DropdownButtonFormField<BillingCycle>(
-        value: _selectedBillingCycle,
+        initialValue: _selectedBillingCycle,
         decoration: InputDecoration(
           labelText: 'Billing Cycle',
           filled: true,
-          fillColor: Theme.of(context).brightness == Brightness.dark ? Colors.grey[800] : Colors.grey[200],
+          fillColor: Theme.of(context).brightness == Brightness.dark
+              ? Colors.grey[800]
+              : Colors.grey[200],
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
             borderSide: BorderSide.none,
@@ -422,18 +481,24 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
   Widget _buildCategoryField() {
     return _buildContainerForField(
       child: DropdownButtonFormField<String>(
-        value: _categoryController.text.isEmpty ? null : _categoryController.text,
+        initialValue: _categoryController.text.isEmpty
+            ? null
+            : _categoryController.text,
         hint: const Text('Category'),
-         decoration: InputDecoration(
+        decoration: InputDecoration(
           labelText: 'Category',
           filled: true,
-          fillColor: Theme.of(context).brightness == Brightness.dark ? Colors.grey[800] : Colors.grey[200],
+          fillColor: Theme.of(context).brightness == Brightness.dark
+              ? Colors.grey[800]
+              : Colors.grey[200],
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
             borderSide: BorderSide.none,
           ),
         ),
-        items: _categories.map((cat) => DropdownMenuItem(value: cat, child: Text(cat))).toList(),
+        items: _categories
+            .map((cat) => DropdownMenuItem(value: cat, child: Text(cat)))
+            .toList(),
         onChanged: (value) {
           if (value != null) setState(() => _categoryController.text = value);
         },
@@ -450,9 +515,36 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
           setState(() => _receiveReminders = value);
         },
         contentPadding: const EdgeInsets.symmetric(horizontal: 12.0),
-        shape: RoundedRectangleBorder(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  // New widget to select reminder period
+  Widget _buildReminderPeriodField() {
+    return _buildContainerForField(
+      child: DropdownButtonFormField<int>(
+        initialValue: _selectedReminderDays,
+        decoration: InputDecoration(
+          labelText: 'Remind Me Before',
+          filled: true,
+          fillColor: Theme.of(context).brightness == Brightness.dark
+              ? Colors.grey[800]
+              : Colors.grey[200],
+          border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide.none,
+          ),
         ),
+        items: [1, 2, 3].map((days) {
+          return DropdownMenuItem<int>(
+            value: days,
+            child: Text('$days day${days > 1 ? 's' : ''} before'),
+          );
+        }).toList(),
+        onChanged: (value) {
+          if (value != null) setState(() => _selectedReminderDays = value);
+        },
       ),
     );
   }
@@ -460,11 +552,12 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
   Widget _buildContainerForField({required Widget child}) {
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[800] : Colors.grey[200],
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Colors.grey[800]
+            : Colors.grey[200],
         borderRadius: BorderRadius.circular(10),
       ),
       child: child,
     );
   }
 }
-
