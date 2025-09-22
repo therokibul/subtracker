@@ -1,7 +1,7 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 
 enum BillingCycle { daily, weekly, monthly, yearly }
+
 enum LogoType { network, file }
 
 class Subscription {
@@ -9,7 +9,6 @@ class Subscription {
   final String name;
   final double amount;
   final DateTime lastPaidDate;
-  final DateTime nextPaymentDate;
   final String currency;
   final BillingCycle billingCycle;
   final Color color;
@@ -18,14 +17,13 @@ class Subscription {
   final bool receiveReminders;
   final String? logoIdentifier;
   final LogoType logoType;
-  final int reminderDaysBefore; // New field to store reminder preference
+  final int reminderDaysBefore;
 
   Subscription({
     required this.id,
     required this.name,
     required this.amount,
     required this.lastPaidDate,
-    required this.nextPaymentDate,
     required this.currency,
     required this.billingCycle,
     required int colorValue,
@@ -34,13 +32,35 @@ class Subscription {
     this.receiveReminders = true,
     this.logoIdentifier,
     this.logoType = LogoType.network,
-    this.reminderDaysBefore = 3, // Default reminder is 3 days before
+    this.reminderDaysBefore = 3,
   }) : color = Color(colorValue);
 
-  // Helper to get the color value for JSON serialization
+  // The nextPaymentDate is now a getter that calculates the date on the fly.
+  DateTime get nextPaymentDate {
+    DateTime nextDate = lastPaidDate;
+    // Keep adding the billing cycle duration until the date is in the future.
+    while (nextDate.isBefore(DateTime.now())) {
+      switch (billingCycle) {
+        case BillingCycle.daily:
+          nextDate = nextDate.add(const Duration(days: 1));
+          break;
+        case BillingCycle.weekly:
+          nextDate = nextDate.add(const Duration(days: 7));
+          break;
+        case BillingCycle.monthly:
+          nextDate = DateTime(nextDate.year, nextDate.month + 1, nextDate.day);
+          break;
+        case BillingCycle.yearly:
+          nextDate = DateTime(nextDate.year + 1, nextDate.month, nextDate.day);
+          break;
+      }
+    }
+    return nextDate;
+  }
+
+  // ignore: deprecated_member_use
   int get colorValue => color.value;
 
-  // Converts a Subscription object into a Map for JSON serialization.
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -49,24 +69,23 @@ class Subscription {
       'lastPaidDate': lastPaidDate.toIso8601String(),
       'currency': currency,
       'billingCycle': billingCycle.index,
+      // ignore: deprecated_member_use
       'colorValue': color.value,
       'note': note,
       'category': category,
       'receiveReminders': receiveReminders,
       'logoIdentifier': logoIdentifier,
       'logoType': logoType.index,
-      'reminderDaysBefore': reminderDaysBefore, // Save to JSON
+      'reminderDaysBefore': reminderDaysBefore,
     };
   }
 
-  // Creates a Subscription object from a Map (JSON).
   factory Subscription.fromJson(Map<String, dynamic> json) {
     return Subscription(
       id: json['id'] as String,
       name: json['name'] as String,
       amount: json['amount'] as double,
       lastPaidDate: DateTime.parse(json['lastPaidDate'] as String),
-      nextPaymentDate: DateTime.now(), // This will be recalculated anyway
       currency: json['currency'] as String,
       billingCycle: BillingCycle.values[json['billingCycle'] as int],
       colorValue: json['colorValue'] as int,
@@ -74,9 +93,10 @@ class Subscription {
       category: json['category'] as String?,
       receiveReminders: json['receiveReminders'] as bool? ?? true,
       logoIdentifier: json['logoIdentifier'] as String?,
-      logoType: json['logoType'] != null ? LogoType.values[json['logoType'] as int] : LogoType.network,
-      reminderDaysBefore: json['reminderDaysBefore'] as int? ?? 3, // Load from JSON with a default
+      logoType: json['logoType'] != null
+          ? LogoType.values[json['logoType'] as int]
+          : LogoType.network,
+      reminderDaysBefore: json['reminderDaysBefore'] as int? ?? 3,
     );
   }
 }
-

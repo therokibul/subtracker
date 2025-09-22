@@ -35,9 +35,8 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
   String _selectedCurrency = 'USD';
   Color _selectedColor = Colors.deepPurple;
   bool _receiveReminders = true;
-  int _selectedReminderDays = 3; // State for reminder days
+  int _selectedReminderDays = 3;
 
-  // State variables for the logo
   String? _logoIdentifier;
   LogoType _logoType = LogoType.network;
 
@@ -67,8 +66,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
       _receiveReminders = sub.receiveReminders;
       _logoIdentifier = sub.logoIdentifier;
       _logoType = sub.logoType;
-      _selectedReminderDays =
-          sub.reminderDaysBefore; // Initialize from existing sub
+      _selectedReminderDays = sub.reminderDaysBefore;
     }
   }
 
@@ -95,27 +93,6 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
     });
   }
 
-  DateTime _calculateNextPaymentDate(DateTime lastPaid, BillingCycle cycle) {
-    DateTime nextDate = lastPaid;
-    while (nextDate.isBefore(DateTime.now())) {
-      switch (cycle) {
-        case BillingCycle.daily:
-          nextDate = nextDate.add(const Duration(days: 1));
-          break;
-        case BillingCycle.weekly:
-          nextDate = nextDate.add(const Duration(days: 7));
-          break;
-        case BillingCycle.monthly:
-          nextDate = DateTime(nextDate.year, nextDate.month + 1, nextDate.day);
-          break;
-        case BillingCycle.yearly:
-          nextDate = DateTime(nextDate.year + 1, nextDate.month, nextDate.day);
-          break;
-      }
-    }
-    return nextDate;
-  }
-
   void _saveForm() {
     final isValid = _formKey.currentState?.validate() ?? false;
     if (!isValid || _lastPaidDate == null) {
@@ -131,26 +108,21 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
     }
     _formKey.currentState?.save();
 
-    final nextPaymentDate = _calculateNextPaymentDate(
-      _lastPaidDate!,
-      _selectedBillingCycle,
-    );
-
     final newSubscription = Subscription(
       id: widget.subscription?.id ?? DateTime.now().toString(),
       name: _nameController.text,
       amount: double.parse(_amountController.text),
       lastPaidDate: _lastPaidDate!,
-      nextPaymentDate: nextPaymentDate,
       currency: _selectedCurrency,
       billingCycle: _selectedBillingCycle,
       note: _noteController.text,
+      // ignore: deprecated_member_use
       colorValue: _selectedColor.value,
       category: _categoryController.text,
       receiveReminders: _receiveReminders,
       logoIdentifier: _logoIdentifier,
       logoType: _logoType,
-      reminderDaysBefore: _selectedReminderDays, // Save the selected days
+      reminderDaysBefore: _selectedReminderDays,
     );
 
     final provider = Provider.of<SubscriptionProvider>(context, listen: false);
@@ -171,9 +143,9 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
         title: 'Upcoming Payment: ${newSubscription.name}',
         body:
             'Your payment of ${getCurrencySymbol(newSubscription.currency)} ${newSubscription.amount.toStringAsFixed(2)} is due in $days day${days > 1 ? 's' : ''}.',
-        scheduledDate: nextPaymentDate.subtract(
+        scheduledDate: newSubscription.nextPaymentDate.subtract(
           Duration(days: days),
-        ), // Use dynamic days
+        ),
       );
     }
 
@@ -231,8 +203,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
                         setState(() {
                           _logoIdentifier = logoUrl;
                           _logoType = LogoType.network;
-                          _nameController.text =
-                              logoName; // Auto-fill the title
+                          _nameController.text = logoName;
                         });
                         Navigator.of(ctx).pop();
                       },
@@ -318,7 +289,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
               _buildReminderField(),
               if (_receiveReminders) ...[
                 const SizedBox(height: 16),
-                _buildReminderPeriodField(), // Conditionally show the new dropdown
+                _buildReminderPeriodField(),
               ],
             ],
           ),
@@ -453,6 +424,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
   Widget _buildBillingCycleField() {
     return _buildContainerForField(
       child: DropdownButtonFormField<BillingCycle>(
+        key: ValueKey(_selectedBillingCycle),
         initialValue: _selectedBillingCycle,
         decoration: InputDecoration(
           labelText: 'Billing Cycle',
@@ -481,6 +453,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
   Widget _buildCategoryField() {
     return _buildContainerForField(
       child: DropdownButtonFormField<String>(
+        key: ValueKey(_categoryController.text),
         initialValue: _categoryController.text.isEmpty
             ? null
             : _categoryController.text,
@@ -520,10 +493,10 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
     );
   }
 
-  // New widget to select reminder period
   Widget _buildReminderPeriodField() {
     return _buildContainerForField(
       child: DropdownButtonFormField<int>(
+        key: ValueKey(_selectedReminderDays),
         initialValue: _selectedReminderDays,
         decoration: InputDecoration(
           labelText: 'Remind Me Before',
@@ -536,7 +509,8 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
             borderSide: BorderSide.none,
           ),
         ),
-        items: [1, 2, 3].map((days) {
+        items: [1, 2, 3, 5, 7].map((days) {
+          // Added more options
           return DropdownMenuItem<int>(
             value: days,
             child: Text('$days day${days > 1 ? 's' : ''} before'),
